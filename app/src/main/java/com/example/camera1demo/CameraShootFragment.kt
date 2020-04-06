@@ -34,7 +34,7 @@ class CameraShootFragment : Fragment(), SurfaceHolder.Callback, Camera.PreviewCa
         const val FACING_BACK = Camera.CameraInfo.CAMERA_FACING_BACK
         const val FACING_FRONT = Camera.CameraInfo.CAMERA_FACING_FRONT
         private const val yuvqueuesize = 100
-        var YUVQueue: ArrayBlockingQueue<IntArray?>? = ArrayBlockingQueue<IntArray?>(yuvqueuesize)
+        var YUVQueue: ArrayBlockingQueue<Bitmap?>? = ArrayBlockingQueue(yuvqueuesize)
 
         fun newInstance() = CameraShootFragment()
 
@@ -44,9 +44,7 @@ class CameraShootFragment : Fragment(), SurfaceHolder.Callback, Camera.PreviewCa
     private var rotationDegree: Int = 0
     private var avcEncoder: AvcEncoder? = null
 
-    private var encodeThread: HandlerThread = HandlerThread("encodeThread").apply { start() }
     private var bitmapThread: HandlerThread = HandlerThread("bitmapThread").apply { start() }
-    private var encodeHandler: Handler = Handler(encodeThread.looper)
     private var bitmapHandler: Handler = Handler(bitmapThread.looper)
 
     /**
@@ -91,6 +89,10 @@ class CameraShootFragment : Fragment(), SurfaceHolder.Callback, Camera.PreviewCa
 
     var shoot: Boolean = false
     var record: Boolean = false
+    private var videoRecorder:FrameVideoRecorder?=null
+
+
+    var startRecordeUs = 0L
     private fun initViewClick() {
         bt_shot.setOnClickListener {
             shoot = true
@@ -99,11 +101,9 @@ class CameraShootFragment : Fragment(), SurfaceHolder.Callback, Camera.PreviewCa
             record = !record
             bt_shoot.text = if (record) {
                 record = true
-                val previewSize = mCurrentCamera?.parameters?.previewSize
-                encodeHandler.post {
-                    avcEncoder = AvcEncoder(30, outPath, 0)
-                    avcEncoder?.start(previewSize!!.height, previewSize!!.width)
-                }
+                startRecordeUs = System.nanoTime()/1000L
+                videoRecorder = FrameVideoRecorder().setVideoSavePath(outPath)
+                videoRecorder?.start(previewWidth,previewHeight)
 //                avEncoder = AvcEncoder(
 //                    previewSize!!.width,
 //                    previewSize!!.height,
@@ -114,10 +114,8 @@ class CameraShootFragment : Fragment(), SurfaceHolder.Callback, Camera.PreviewCa
                 "停"
             } else {
                 record = false
-                avcEncoder?.isRunning = false
-                encodeHandler.post {
-                    avcEncoder?.finish()
-                }
+                startRecordeUs = 0L
+                videoRecorder?.stop()
 //                avEncoder?.StopThread()
 //                avcEncoder?.finish()
                 "摄"
@@ -198,9 +196,7 @@ class CameraShootFragment : Fragment(), SurfaceHolder.Callback, Camera.PreviewCa
 
     fun configCameraParameters() {
 
-        surfaceView.viewTreeObserver.addOnGlobalLayoutListener {
-            LogUtils.d("-----------------${surfaceView.height} ${surfaceView.width}")
-        }
+
 
         val longSide = max(ScreenUtils.getScreenHeight(), ScreenUtils.getScreenWidth())
         val shortSide = min(ScreenUtils.getScreenHeight(), ScreenUtils.getScreenWidth())
@@ -211,12 +207,16 @@ class CameraShootFragment : Fragment(), SurfaceHolder.Callback, Camera.PreviewCa
 
         mCurrentCamera!!.parameters?.also {
             it.setRotation(rotationDegree)
+            it.previewFrameRate = 30
             setPreviewSize(it, longSide, shortSide)
             mCurrentCamera?.setDisplayOrientation(
                 rotationDegree
             )
             mCurrentCamera!!.parameters = it
         }
+
+        LogUtils.d("-----------------${previewWidth} ${previewHeight}")
+
     }
 
     private val PREVIEW_FORMAT = ImageFormat.NV21
@@ -232,7 +232,10 @@ class CameraShootFragment : Fragment(), SurfaceHolder.Callback, Camera.PreviewCa
         return supportedPreviewFormats != null && supportedPreviewFormats.contains(format)
     }
 
-    private var previewSize: Camera.Size? = null
+//    private var previewSize: Camera.Size? = null
+    private var previewWidth = 0
+    private var previewHeight = 0
+    
 
     private fun setPreviewSize(parameters: Camera.Parameters, longSide: Int, shortSide: Int) {
         if (mCurrentCamera != null && longSide != 0 && shortSide != 0) {
@@ -243,7 +246,8 @@ class CameraShootFragment : Fragment(), SurfaceHolder.Callback, Camera.PreviewCa
             }
             for (size in supportPreviewSize) {
                 if (size.width * 1f / size.height == aspectRatio && size.height <= shortSide && size.width <= longSide) {
-                    previewSize = size
+                    previewHeight = size.width
+                    previewWidth = size.height
                     parameters.setPreviewSize(size.width, size.height)
                     if (isPreviewFormatSupported(parameters, PREVIEW_FORMAT)) {
                         parameters.previewFormat = PREVIEW_FORMAT
@@ -305,162 +309,76 @@ class CameraShootFragment : Fragment(), SurfaceHolder.Callback, Camera.PreviewCa
         mCurrentCamera?.stopPreview()
     }
 
-    var now = System.currentTimeMillis()
-    var fps = 0
 
     override fun onPreviewFrame(data: ByteArray?, camera: Camera?) {
         mCurrentCamera?.addCallbackBuffer(data)
+
+        val now = System.nanoTime()/1000L
+        var timestamp = 0L
+        if (record && startRecordeUs == 0L){
+            startRecordeUs = now
+        }else{
+            timestamp = now - startRecordeUs
+        }
+
+
+//        calculaeFps()
         bitmapHandler.post {
-            //            val bitmap = generatePicture(data)
-//            val bitmap = data
+
             if (shoot && data != null) {
-                val now = System.currentTimeMillis()
-                val rawBitmap = nV21ToBitmap.nv21ToBitmap(data,previewSize!!.width,previewSize!!.height)
-                val mirrorVeticalMatrix = Matrix().apply {
-                    if (mCurrentCameraId == facingFrontCameraId) postScale(1f, -1f)
-                    val degree = if (mCurrentCameraId == facingFrontCameraId) 270 else rotationDegree
-                    postRotate(degree.toFloat())
-                }
-                val bitmap = Bitmap.createBitmap(
-                    rawBitmap,
-                    0,
-                    0,
-                    rawBitmap.width,
-                    rawBitmap.height,
-                    mirrorVeticalMatrix,
-                    true
-                )
+                val data2 = obtaintTrueByte(data)
+                val bitmap = generateBitmap(data2!!)//旋转后的 previewWidth 才成为视觉上的宽
                 activity?.runOnUiThread {
                     bitmap?.also { iv_preview.setImageBitmap(it) }
                 }
-                LogUtils.d("转换耗时:${System.currentTimeMillis() - now}")
                 shoot= false
             }
 
             if (record && data != null && data.isNotEmpty()) {
-                val now = System.currentTimeMillis()
-                val rawBitmap = nV21ToBitmap.nv21ToBitmap(data,previewSize!!.width,previewSize!!.height)
-                val mirrorVeticalMatrix = Matrix().apply {
-                    if (mCurrentCameraId == facingFrontCameraId) postScale(1f, -1f)
-                    val degree = if (mCurrentCameraId == facingFrontCameraId) 270 else rotationDegree
-                    postRotate(degree.toFloat())
-                }
-                val bitmap = Bitmap.createBitmap(
-                    rawBitmap,
-                    0,
-                    0,
-                    rawBitmap.width,
-                    rawBitmap.height,
-                    mirrorVeticalMatrix,
-                    true
-                )
-//                val tempByte  = nV21ToBitmap.nv21ToBitmap(data,previewSize!!.width,previewSize!!.height)
-                val tempByte = IntArray(bitmap.width * bitmap.height)
-                    bitmap.getPixels(tempByte, 0, bitmap.width, 0, 0, bitmap.width, bitmap.height)
-                LogUtils.d("转换耗时:${System.currentTimeMillis() - now}")
-                tempByte?.also {
-                    putYUVData(it)
-//                    LogUtils.d("未处理队列：${YUVQueue!!.size}")
+//                val now = System.currentTimeMillis()
+                val data2 = obtaintTrueByte(data)
+                val bitmap = generateBitmap(data2!!)
+//                LogUtils.d("图片处理耗时:${System.currentTimeMillis() - now}")
+                bitmap?.also {
+                    videoRecorder?.putVideoFrame(VideoFrame(it,timestamp))
+                    LogUtils.d(" timestamp2 : $timestamp")
+//                    putYUVData(it)
+                    LogUtils.d("未处理队列：${YUVQueue!!.size}")
                 }
             }
         }
 
     }
 
-    private fun getYuvData(data: ByteArray): ByteArray {
-        val width = previewSize!!.width
-        val height = previewSize!!.height
-        val length = width * height * 3 / 2
-        val dataYUV420P = ByteArray(width * height * 3 / 2)
 
-// 每一帧的大小
-        // 每一帧的大小
-        val framesize = width * height
-        var i = 0
-        var j = 0
-
-// 这块没问题--Y
-        // 这块没问题--Y
-
-        i = 0
-        while (i < framesize) {
-            dataYUV420P[i] = data[i]
-            i++
+    fun obtaintTrueByte(data: ByteArray):ByteArray?{
+        return if (mCurrentCameraId != facingFrontCameraId){
+            rotateYUV420Degree90(data,previewHeight,previewWidth)//原始帧是未旋转的 previewHeight 即原图的宽
+        }else{
+            rotateYUV420Degree270(data,previewHeight,previewWidth)//
         }
+    }
 
-// U
-        // U
-        i = 0
-
-        j = 0
-        while (j < framesize / 2) {
-            dataYUV420P[i + framesize * 5 / 4] = data[j + framesize]
-            i++
-            j += 2
-        }
-
-        i = 0
-
-        j = 1
-        while (j < framesize / 2) {
-            dataYUV420P[i + framesize] = data[j + framesize]
-            i++
-            j += 2
-        }
-        return dataYUV420P
+    fun generateBitmap(data: ByteArray):Bitmap {
+        return nV21ToBitmap.nv21ToBitmap(data,previewWidth,previewHeight)
     }
 
 
-    fun generatePicture(data: ByteArray?): Bitmap? {
-        return previewSize?.let {
-            val previewSize = it
-            val yuvImage =
-                YuvImage(data, ImageFormat.NV21, previewSize.width, previewSize.height, null)
-            val baos = ByteArrayOutputStream()
-            yuvImage.compressToJpeg(
-                Rect(0, 0, previewSize.width, previewSize.height),
-                60,
-                baos
-            )
-            val rawImage = baos.toByteArray()
-            val opts = BitmapFactory.Options()
-            opts.inPreferredConfig = Bitmap.Config.RGB_565
-            val rawBitmap = BitmapFactory.decodeByteArray(rawImage, 0, rawImage.size, opts)
-            val picture = ImageUtils.rotate(
-                rawBitmap,
-                getCameraDisplayOrientation(activity!!, mCurrentCameraInfo!!),
-                0f,
-                0f
-            ).let { letBitmap ->
-                if (mCurrentCameraId == facingFrontCameraId) {
-//                        val canvas = Bitmap.createBitmap(letBitmap.width,letBitmap.height,Bitmap.Config.RGB_565).run { Canvas(this) }
-                    val mirrorVeticalMatrix = Matrix().apply { setScale(1f, -1f) }
-//                        canvas.drawBitmap(letBitmap,mirrorVeticalMatrix,null)
-                    Bitmap.createBitmap(
-                        letBitmap,
-                        0,
-                        0,
-                        letBitmap.width,
-                        letBitmap.height,
-                        mirrorVeticalMatrix,
-                        true
-                    )
-                } else {
-                    letBitmap
-                }
-            }
 
-            picture
+    var nows = System.currentTimeMillis()
+    var fps = 0
+    fun calculaeFps(){
+        if (System.currentTimeMillis() - nows >= 1000L){
+            nows = System.currentTimeMillis()
+            LogUtils.d("fps:${fps}")
+            fps = 0
+        }else{
+            ++fps
         }
-
     }
 
 
-    fun putYUVData(buffer: IntArray?) {
-        if (YUVQueue!!.size >= yuvqueuesize) {
-            YUVQueue?.poll()
-        }
-        YUVQueue!!.add(buffer)
-    }
+
+
 
 }

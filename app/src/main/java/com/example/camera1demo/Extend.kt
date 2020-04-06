@@ -30,7 +30,6 @@ fun getCameraDisplayOrientation(activity:Activity,cameraInfo: CameraInfo): Int {
     return result
 }
 
-
 fun rotateYUV420Degree90(
     data: ByteArray,
     imageWidth: Int,
@@ -60,14 +59,13 @@ fun rotateYUV420Degree90(
     return yuv
 }
 
-
 fun rotateYUV420Degree180(
     data: ByteArray,
     imageWidth: Int,
     imageHeight: Int
 ): ByteArray? {
     val yuv = ByteArray(imageWidth * imageHeight * 3 / 2)
-    var i = 0
+    var i: Int
     var count = 0
     i = imageWidth * imageHeight - 1
     while (i >= 0) {
@@ -76,33 +74,31 @@ fun rotateYUV420Degree180(
         i--
     }
     i = imageWidth * imageHeight * 3 / 2 - 1
-    i = imageWidth * imageHeight * 3 / 2 - 1
     while (i >= imageWidth
         * imageHeight
     ) {
-        yuv[count++] = data[i - 1]
-        yuv[count++] = data[i]
+        yuv[count] = data[i - 1]
+        count++
+        yuv[count] = data[i]
+        count++
         i -= 2
     }
     return yuv
 }
 
 fun rotateYUV420Degree270(
-    data: ByteArray, imageWidth: Int,
+    data: ByteArray,
+    imageWidth: Int,
     imageHeight: Int
 ): ByteArray? {
     val yuv = ByteArray(imageWidth * imageHeight * 3 / 2)
-    var nWidth = 0
-    var nHeight = 0
     var wh = 0
     var uvHeight = 0
-    if (imageWidth != nWidth || imageHeight != nHeight) {
-        nWidth = imageWidth
-        nHeight = imageHeight
+    if (imageWidth != 0 || imageHeight != 0) {
         wh = imageWidth * imageHeight
-        uvHeight = imageHeight shr 1 // uvHeight = height / 2
+        uvHeight = imageHeight shr 1 //uvHeight = height / 2
     }
-    // ??Y
+    //旋转Y
     var k = 0
     for (i in 0 until imageWidth) {
         var nPos = 0
@@ -123,66 +119,32 @@ fun rotateYUV420Degree270(
         }
         i += 2
     }
+    //这一部分可以直接旋转270度，但是图像颜色不对
+//	    // Rotate the Y luma
+//	    int i = 0;
+//	    for(int x = imageWidth-1;x >= 0;x--)
+//	    {
+//	        for(int y = 0;y < imageHeight;y++)
+//	        {
+//	            yuv[i] = data[y*imageWidth+x];
+//	            i++;
+//	        }
+//
+//	    }
+//	    // Rotate the U and V color components
+//		i = imageWidth*imageHeight;
+//	    for(int x = imageWidth-1;x > 0;x=x-2)
+//	    {
+//	        for(int y = 0;y < imageHeight/2;y++)
+//	        {
+//	            yuv[i] = data[(imageWidth*imageHeight)+(y*imageWidth)+x];
+//	            i++;
+//	            yuv[i] = data[(imageWidth*imageHeight)+(y*imageWidth)+(x-1)];
+//	            i++;
+//	        }
+//	    }
     return rotateYUV420Degree180(yuv, imageWidth, imageHeight)
 }
 
 
-//镜像；
-fun frameMirror(data: ByteArray, width: Int, height: Int): ByteArray? {
-    var tempData: Byte
-    for (i in 0 until height * 3 / 2) {
-        for (j in 0 until width / 2) {
-            tempData = data[i * width + j]
-            data[i * width + j] = data[(i + 1) * width - 1 - j]
-            data[(i + 1) * width - 1 - j] = tempData
-        }
-    }
-    return data
-}
 
-
-fun NV21_mirror(nv21_data: ByteArray, width: Int, height: Int): ByteArray? {
-    var i: Int
-    var left: Int
-    var right: Int
-    var temp: Byte
-    var startPos = 0
-    // mirror Y
-    i = 0
-    while (i < height) {
-        left = startPos
-        right = startPos + width - 1
-        while (left < right) {
-            temp = nv21_data[left]
-            nv21_data[left] = nv21_data[right]
-            nv21_data[right] = temp
-            left++
-            right--
-        }
-        startPos += width
-        i++
-    }
-    // mirror U and V
-    val offset = width * height
-    startPos = 0
-    i = 0
-    while (i < height / 2) {
-        left = offset + startPos
-        right = offset + startPos + width - 2
-        while (left < right) {
-            temp = nv21_data[left]
-            nv21_data[left] = nv21_data[right]
-            nv21_data[right] = temp
-            left++
-            right--
-            temp = nv21_data[left]
-            nv21_data[left] = nv21_data[right]
-            nv21_data[right] = temp
-            left++
-            right--
-        }
-        startPos += width
-        i++
-    }
-    return nv21_data
-}

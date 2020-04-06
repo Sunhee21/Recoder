@@ -11,6 +11,7 @@ import android.os.Build;
 import android.util.Log;
 
 import com.blankj.utilcode.util.LogUtils;
+import com.blankj.utilcode.util.TimeUtils;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -48,7 +49,7 @@ public class AvcEncoder {
 
     }
 
-    public void start(int width, int height) {
+    public void start(int width,int height) {
         LogUtils.d("开始");
         this.width = width;
         this.height = height;
@@ -163,13 +164,13 @@ public class AvcEncoder {
         return 132 + frameIndex * 1000000 / mFrameRate;
     }
 
-    private byte[] getNV12(int inputWidth, int inputHeight, int[] argb) {
+    private byte[] getNV12(int inputWidth, int inputHeight, Bitmap scaled) {
         // Reference (Variation) : https://gist.github.com/wobbals/5725412
 
-//        int[] argb = new int[inputWidth * inputHeight];
+        int[] argb = new int[inputWidth * inputHeight];
 
-//        //Log.i(TAG, "scaled : " + scaled);
-//        scaled.getPixels(argb, 0, inputWidth, 0, 0, inputWidth, inputHeight);
+        //Log.i(TAG, "scaled : " + scaled);
+        scaled.getPixels(argb, 0, inputWidth, 0, 0, inputWidth, inputHeight);
 
         byte[] yuv = new byte[inputWidth * inputHeight * 3 / 2];
 
@@ -441,17 +442,16 @@ public class AvcEncoder {
             buffers = mediaCodec.getInputBuffers();
         }
         while (isRunning) {
-            long now = System.currentTimeMillis();
-
-            int[] yuvIntArray = CameraShootFragment.Companion.getYUVQueue().poll();
-            if (yuvIntArray == null || yuvIntArray.length <= 0){
-                LogUtils.d("yuvIntArray == null");
+            VideoFrame yuvIntArray = FrameVideoRecorder.Companion.getFrameQueue().poll();
+            if (yuvIntArray == null){
                 continue;
             }
+            long now = System.currentTimeMillis();
             int inputBufferIndex = mediaCodec.dequeueInputBuffer(-1);
             if (inputBufferIndex >= 0) {
-                long ptsUsec = computePresentationTime(generateIndex);
-                byte[] nv12ByteArray = getNV12(getSize(width),getSize(height),yuvIntArray);
+                long ptsUsec = yuvIntArray.getTimestamp();
+                LogUtils.d("ptsUsec : "+ptsUsec);
+                byte[] nv12ByteArray = getNV12(getSize(width),getSize(height),yuvIntArray.getFrameBitmap());
                 ByteBuffer inputBuffer = null;
                 if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.LOLLIPOP) {
                     inputBuffer = buffers[inputBufferIndex];
@@ -510,7 +510,8 @@ public class AvcEncoder {
 
                         Log.d(TAG, "BufferInfo: " + bufferInfo.offset + ","
                                 + bufferInfo.size + ","
-                                + bufferInfo.presentationTimeUs);
+                                + bufferInfo.presentationTimeUs + ","
+                                + TimeUtils.millis2String(bufferInfo.presentationTimeUs/1000,"mm:ss"));
 
                         try {
                             mediaMuxer.writeSampleData(mTrackIndex, outputBuffer, bufferInfo);
