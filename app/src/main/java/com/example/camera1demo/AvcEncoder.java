@@ -8,13 +8,17 @@ import android.media.MediaCodecList;
 import android.media.MediaFormat;
 import android.media.MediaMuxer;
 import android.os.Build;
+import android.os.Handler;
+import android.os.Looper;
 import android.util.Log;
 
 import com.blankj.utilcode.util.LogUtils;
 import com.blankj.utilcode.util.TimeUtils;
 
 import java.io.IOException;
+import java.lang.invoke.CallSite;
 import java.nio.ByteBuffer;
+import java.util.concurrent.Callable;
 
 
 public class AvcEncoder {
@@ -132,8 +136,23 @@ public class AvcEncoder {
     }
 
 
-    public void finish() {
+    public interface OnStopListener{
+        void onStop();
+    }
+
+    private  OnStopListener onStopListener;
+
+
+    public void stop(OnStopListener callable){
         isRunning = false;
+        this.onStopListener = callable;
+    }
+
+
+    /**
+     * 必须先stop() 再finish()
+     */
+    public void finish() {
         if (mediaCodec != null) {
             mediaCodec.stop();
             mediaCodec.release();
@@ -348,92 +367,92 @@ public class AvcEncoder {
     }
 
 
-    private void drainEncoder(boolean endOfStream, MediaCodec.BufferInfo bufferInfo) {
-        final int TIMEOUT_USEC = 10000;
-
-        ByteBuffer[] buffers = null;
-        if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.LOLLIPOP) {
-            buffers = mediaCodec.getOutputBuffers();
-        }
-
-        if (endOfStream) {
-            try {
-                mediaCodec.signalEndOfInputStream();
-            } catch (Exception e) {
-            }
-        }
-
-        while (true) {
-            int encoderStatus = mediaCodec.dequeueOutputBuffer(bufferInfo, TIMEOUT_USEC);
-            if (encoderStatus == MediaCodec.INFO_TRY_AGAIN_LATER) {
-                if (!endOfStream) {
-                    break; // out of while
-                } else {
-                    Log.i(TAG, "no output available, spinning to await EOS");
-                }
-            } else if (encoderStatus == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED) {
-                if (mMuxerStarted) {
-                    throw new RuntimeException("format changed twice");
-                }
-
-                MediaFormat mediaFormat = mediaCodec.getOutputFormat();
-                mTrackIndex = mediaMuxer.addTrack(mediaFormat);
-                mediaMuxer.start();
-                mMuxerStarted = true;
-            } else if (encoderStatus < 0) {
-                Log.i(TAG, "unexpected result from encoder.dequeueOutputBuffer: " + encoderStatus);
-            } else {
-                ByteBuffer outputBuffer = null;
-                if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.LOLLIPOP) {
-                    outputBuffer = buffers[encoderStatus];
-                } else {
-                    outputBuffer = mediaCodec.getOutputBuffer(encoderStatus);
-                }
-
-                if (outputBuffer == null) {
-                    throw new RuntimeException("encoderOutputBuffer "
-                            + encoderStatus + " was null");
-                }
-
-                if ((bufferInfo.flags & MediaCodec.BUFFER_FLAG_CODEC_CONFIG) != 0) {
-                    Log.d(TAG, "ignoring BUFFER_FLAG_CODEC_CONFIG");
-                    bufferInfo.size = 0;
-                }
-
-                if (bufferInfo.size != 0) {
-                    if (!mMuxerStarted) {
-                        throw new RuntimeException("muxer hasn't started");
-                    }
-
-                    // adjust the ByteBuffer values to match BufferInfo
-                    outputBuffer.position(bufferInfo.offset);
-                    outputBuffer.limit(bufferInfo.offset + bufferInfo.size);
-
-                    Log.d(TAG, "BufferInfo: " + bufferInfo.offset + ","
-                            + bufferInfo.size + ","
-                            + bufferInfo.presentationTimeUs);
-
-                    try {
-                        mediaMuxer.writeSampleData(mTrackIndex, outputBuffer, bufferInfo);
-                    } catch (Exception e) {
-                        Log.i(TAG, "Too many frames");
-                    }
-
-                }
-
-                mediaCodec.releaseOutputBuffer(encoderStatus, false);
-
-                if ((bufferInfo.flags & MediaCodec.BUFFER_FLAG_END_OF_STREAM) != 0) {
-                    if (!endOfStream) {
-                        Log.i(TAG, "reached end of stream unexpectedly");
-                    } else {
-                        Log.i(TAG, "end of stream reached");
-                    }
-                    break; // out of while
-                }
-            }
-        }
-    }
+//    private void drainEncoder(boolean endOfStream, MediaCodec.BufferInfo bufferInfo) {
+//        final int TIMEOUT_USEC = 10000;
+//
+//        ByteBuffer[] buffers = null;
+//        if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.LOLLIPOP) {
+//            buffers = mediaCodec.getOutputBuffers();
+//        }
+//
+//        if (endOfStream) {
+//            try {
+//                mediaCodec.signalEndOfInputStream();
+//            } catch (Exception e) {
+//            }
+//        }
+//
+//        while (true) {
+//            int encoderStatus = mediaCodec.dequeueOutputBuffer(bufferInfo, TIMEOUT_USEC);
+//            if (encoderStatus == MediaCodec.INFO_TRY_AGAIN_LATER) {
+//                if (!endOfStream) {
+//                    break; // out of while
+//                } else {
+//                    Log.i(TAG, "no output available, spinning to await EOS");
+//                }
+//            } else if (encoderStatus == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED) {
+//                if (mMuxerStarted) {
+//                    throw new RuntimeException("format changed twice");
+//                }
+//
+//                MediaFormat mediaFormat = mediaCodec.getOutputFormat();
+//                mTrackIndex = mediaMuxer.addTrack(mediaFormat);
+//                mediaMuxer.start();
+//                mMuxerStarted = true;
+//            } else if (encoderStatus < 0) {
+//                Log.i(TAG, "unexpected result from encoder.dequeueOutputBuffer: " + encoderStatus);
+//            } else {
+//                ByteBuffer outputBuffer = null;
+//                if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.LOLLIPOP) {
+//                    outputBuffer = buffers[encoderStatus];
+//                } else {
+//                    outputBuffer = mediaCodec.getOutputBuffer(encoderStatus);
+//                }
+//
+//                if (outputBuffer == null) {
+//                    throw new RuntimeException("encoderOutputBuffer "
+//                            + encoderStatus + " was null");
+//                }
+//
+//                if ((bufferInfo.flags & MediaCodec.BUFFER_FLAG_CODEC_CONFIG) != 0) {
+//                    Log.d(TAG, "ignoring BUFFER_FLAG_CODEC_CONFIG");
+//                    bufferInfo.size = 0;
+//                }
+//
+//                if (bufferInfo.size != 0) {
+//                    if (!mMuxerStarted) {
+//                        throw new RuntimeException("muxer hasn't started");
+//                    }
+//
+//                    // adjust the ByteBuffer values to match BufferInfo
+//                    outputBuffer.position(bufferInfo.offset);
+//                    outputBuffer.limit(bufferInfo.offset + bufferInfo.size);
+//
+//                    Log.d(TAG, "BufferInfo: " + bufferInfo.offset + ","
+//                            + bufferInfo.size + ","
+//                            + bufferInfo.presentationTimeUs);
+//
+//                    try {
+//                        mediaMuxer.writeSampleData(mTrackIndex, outputBuffer, bufferInfo);
+//                    } catch (Exception e) {
+//                        Log.i(TAG, "Too many frames");
+//                    }
+//
+//                }
+//
+//                mediaCodec.releaseOutputBuffer(encoderStatus, false);
+//
+//                if ((bufferInfo.flags & MediaCodec.BUFFER_FLAG_END_OF_STREAM) != 0) {
+//                    if (!endOfStream) {
+//                        Log.i(TAG, "reached end of stream unexpectedly");
+//                    } else {
+//                        Log.i(TAG, "end of stream reached");
+//                    }
+//                    break; // out of while
+//                }
+//            }
+//        }
+//    }
 
     private void encode() {
         final int TIMEOUT_USEC = 10000;
@@ -441,7 +460,7 @@ public class AvcEncoder {
         if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.LOLLIPOP) {
             buffers = mediaCodec.getInputBuffers();
         }
-        while (isRunning) {
+        while (isRunning || FrameVideoRecorder.Companion.getFrameQueue().size() > 0) {
             VideoFrame yuvIntArray = FrameVideoRecorder.Companion.getFrameQueue().poll();
             if (yuvIntArray == null){
                 continue;
@@ -534,7 +553,10 @@ public class AvcEncoder {
 
             }
         }
-        LogUtils.d("over encode " + generateIndex);
+        finish();
+        if (this.onStopListener != null){
+            this.onStopListener.onStop();
+        }
     }
 
 

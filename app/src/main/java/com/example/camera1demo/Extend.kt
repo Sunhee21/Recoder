@@ -146,5 +146,12 @@ fun rotateYUV420Degree270(
     return rotateYUV420Degree180(yuv, imageWidth, imageHeight)
 }
 
+fun obtaintTrueByte(data: ByteArray,isFacingFront:Boolean,previewWidth: Int,previewHeight: Int):ByteArray?{
+    return if (!isFacingFront){
+        rotateYUV420Degree90(data,previewHeight,previewWidth)//原始帧是未旋转的 previewHeight 即原图的宽
+    }else{
+        rotateYUV420Degree270(data,previewHeight,previewWidth)//
+    }
+}
 
 
