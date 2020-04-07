@@ -9,8 +9,11 @@ import android.util.Log;
 
 import androidx.annotation.RequiresApi;
 
+import com.blankj.utilcode.util.FileUtils;
 import com.blankj.utilcode.util.LogUtils;
+import com.blankj.utilcode.util.TimeUtils;
 
+import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 
@@ -174,6 +177,7 @@ public class H264_AAC_toMp4_MediaMuxer {
             videoExtractor = new MediaExtractor();
             mediaMuxer = new MediaMuxer(ouputPath, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4);
             videoExtractor.setDataSource(videoPath);
+            LogUtils.d("file - > " + (new File(audioPath)).length());
             audioExtractor.setDataSource(audioPath);
             int trackCount = videoExtractor.getTrackCount();
             int audioTrackCount = audioExtractor.getTrackCount();
@@ -207,33 +211,6 @@ public class H264_AAC_toMp4_MediaMuxer {
             MediaFormat audiotrackFormat = audioExtractor.getTrackFormat(audioTrackIndex);
             int writeAudioIndex = mediaMuxer.addTrack(audiotrackFormat);
             mediaMuxer.start();
-            //video
-            long sampletime = 0;
-            long audioSampletime = 0;
-            long first_sampletime = 0;
-            long second_sampletime = 0;
-            {
-                videoExtractor.readSampleData(byteBuffer, 0);
-                first_sampletime = videoExtractor.getSampleTime();
-                videoExtractor.advance();
-                second_sampletime = videoExtractor.getSampleTime();
-                sampletime = Math.abs(second_sampletime - first_sampletime);//时间戳
-                Log.d(TAG, "sampletime" + sampletime);
-
-            }
-            //上面只是获取时间戳，获取完后，重新选择下track
-            videoExtractor.unselectTrack(videoTrackIndex);
-            videoExtractor.selectTrack(videoTrackIndex);
-
-            audioExtractor.readSampleData(byteBuffer,0);
-            first_sampletime = audioExtractor.getSampleTime();
-            audioExtractor.advance();
-            second_sampletime = audioExtractor.getSampleTime();
-            audioSampletime = Math.abs(second_sampletime - first_sampletime);//时间戳
-            Log.d(TAG, "audioSampletime" + audioSampletime);
-            //上面只是获取时间戳，获取完后，重新选择下track
-            audioExtractor.unselectTrack(audioTrackIndex);
-            audioExtractor.selectTrack(audioTrackIndex);
 
             while (true) {
                 int readSampleCount = videoExtractor.readSampleData(byteBuffer, 0);
@@ -241,13 +218,18 @@ public class H264_AAC_toMp4_MediaMuxer {
                 if (readSampleCount < 0) {
                     break;
                 }
-                audiobufferInfo.size = readSampleCount;
-                audiobufferInfo.offset = 0;
-                audiobufferInfo.flags = videoExtractor.getSampleFlags();
-                audiobufferInfo.presentationTimeUs += sampletime;
-                mediaMuxer.writeSampleData(writeVideoIndex, byteBuffer, audiobufferInfo);
+                videobufferInfo.size = readSampleCount;
+                videobufferInfo.offset = 0;
+                videobufferInfo.flags = videoExtractor.getSampleFlags();
+                videobufferInfo.presentationTimeUs = videoExtractor.getSampleTime();
+                LogUtils.d("video sample time ： " + videoExtractor.getSampleTime());
+                LogUtils.d("video  us: " + TimeUtils.millis2String(videobufferInfo.presentationTimeUs/1000,"mm:ss"));
+                mediaMuxer.writeSampleData(writeVideoIndex, byteBuffer, videobufferInfo);
                 byteBuffer.clear();
                 videoExtractor.advance();
+            }
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                LogUtils.d("audioExtractor " + audioExtractor.getSampleSize());
             }
             //audio
             while (true) {
@@ -256,11 +238,12 @@ public class H264_AAC_toMp4_MediaMuxer {
                 if (readSampleCount < 0) {
                     break;
                 }
-                videobufferInfo.size = readSampleCount;
-                videobufferInfo.offset = 0;
-                videobufferInfo.flags = audioExtractor.getSampleFlags();
-                videobufferInfo.presentationTimeUs += audioSampletime;
-                mediaMuxer.writeSampleData(writeAudioIndex, byteBuffer, videobufferInfo);
+                audiobufferInfo.size = readSampleCount;
+                audiobufferInfo.offset = 0;
+                audiobufferInfo.flags = audioExtractor.getSampleFlags();
+                audiobufferInfo.presentationTimeUs = audioExtractor.getSampleTime();
+                LogUtils.d("audio sample time ： " + audioExtractor.getSampleTime());
+                mediaMuxer.writeSampleData(writeAudioIndex, byteBuffer, audiobufferInfo);
                 byteBuffer.clear();
                 audioExtractor.advance();
             }

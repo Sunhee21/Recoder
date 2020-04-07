@@ -76,11 +76,10 @@ class CameraShootFragment : Fragment(), SurfaceHolder.Callback, Camera.PreviewCa
         return inflater.inflate(R.layout.fragment_camera_shoot, container, false)
     }
 
-    private lateinit var nV21ToBitmap: NV21ToBitmap
+
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-        nV21ToBitmap = NV21ToBitmap(context!!)
         initViewClick()
         initCameraInfo()
         surfaceView.holder?.addCallback(this)
@@ -244,7 +243,7 @@ class CameraShootFragment : Fragment(), SurfaceHolder.Callback, Camera.PreviewCa
                 LogUtils.d("支持的预览尺寸 : ${it.width} ${it.height}")
             }
             for (size in supportPreviewSize) {
-                if (size.width * 1f / size.height == aspectRatio && size.height <= shortSide && size.width <= longSide) {
+                if (size.width * 1f / size.height >= aspectRatio && size.height <= shortSide && size.width <= longSide) {
                     previewHeight = size.width
                     previewWidth = size.height
                     parameters.setPreviewSize(size.width, size.height)
@@ -312,7 +311,7 @@ class CameraShootFragment : Fragment(), SurfaceHolder.Callback, Camera.PreviewCa
     override fun onPreviewFrame(data: ByteArray?, camera: Camera?) {
         mCurrentCamera?.addCallbackBuffer(data)
         if (data != null)
-            videoRecorder?.addCameraFrameByte(data, mCurrentCameraId == facingFrontCameraId)
+            videoRecorder?.addCameraFrameByte(data, mCurrentCameraId == facingFrontCameraId,previewWidth,previewHeight)
     }
 
 

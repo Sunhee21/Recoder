@@ -14,13 +14,22 @@ public class NV21ToBitmap {
     private ScriptIntrinsicYuvToRGB yuvToRgbIntrinsic;
     private Type.Builder yuvType, rgbaType;
     private Allocation in, out;
+    private int width;
+    private int height;
 
-    public NV21ToBitmap(Context context) {
+    public NV21ToBitmap(Context context,int width,int height) {
         rs = RenderScript.create(context);
         yuvToRgbIntrinsic = ScriptIntrinsicYuvToRGB.create(rs, Element.U8_4(rs));
+        this.width = width;
+        this.height = height;
     }
 
-    public Bitmap nv21ToBitmap(byte[] nv21, int width, int height){
+
+    public boolean checkSize(int width,int height){
+        return  this.width == width && this.width == height;
+    }
+
+    public Bitmap nv21ToBitmap(byte[] nv21){
         if (yuvType == null){
             yuvType = new Type.Builder(rs, Element.U8(rs)).setX(nv21.length);
             in = Allocation.createTyped(rs, yuvType.create(), Allocation.USAGE_SCRIPT);

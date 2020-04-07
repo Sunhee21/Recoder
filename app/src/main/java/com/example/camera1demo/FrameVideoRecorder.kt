@@ -1,13 +1,11 @@
 package com.example.camera1demo
 
-import android.annotation.SuppressLint
 import android.media.MediaRecorder
 import android.os.Handler
 import android.os.HandlerThread
 import android.os.Looper
-import android.os.Message
-import androidx.core.util.Preconditions
 import com.blankj.utilcode.util.FileUtils
+import com.blankj.utilcode.util.LogUtils
 import com.blankj.utilcode.util.Utils
 import java.io.File
 import java.util.concurrent.ArrayBlockingQueue
@@ -58,13 +56,16 @@ class FrameVideoRecorder {
     }
 
     var startRecordeUs = 0L
-    private var nV21ToBitmap: NV21ToBitmap = NV21ToBitmap(Utils.getApp())
+    private var nV21ToBitmap: NV21ToBitmap? = null
 
 
-    val isRecording
+    private val isRecording
         get() = synchronized(recordVideoLock) {
             avcEncoder?.isRunning == true
         }
+
+
+    private var isRecordStart = false
 
 
     private val tempVideoPath
@@ -72,7 +73,7 @@ class FrameVideoRecorder {
     private val tempAudioPath
         get() = run { FileUtils.getDirName(videoSavePath) + "no_video.mp4" }
 
-    fun addCameraFrameByte(byteArray: ByteArray, isFacingFront: Boolean) {
+    fun addCameraFrameByte(byteArray: ByteArray, isFacingFront: Boolean,frameWidth:Int,frameHeight:Int) {
         val now = System.nanoTime() / 1000L
         if (isRecording) {
             val timestamp = if (startRecordeUs == 0L) {/*为0则首帧*/
@@ -82,10 +83,14 @@ class FrameVideoRecorder {
                 now - startRecordeUs
             }
             bitmapHandler.post {
-                val yuvByte = obtaintTrueByte(byteArray, isFacingFront, previewWidth, previewHeight)
+                val yuvByte = obtaintTrueByte(byteArray, isFacingFront, frameWidth, frameHeight)
                     ?: return@post
+                val canUse = nV21ToBitmap?.checkSize(frameWidth,frameHeight)?:false //切换摄像头可能导致帧尺寸改变，改变需要重新实例化
+                if (!canUse){
+                    nV21ToBitmap = NV21ToBitmap(Utils.getApp(),frameWidth,frameHeight)
+                }
                 val bitmap =
-                    nV21ToBitmap?.nv21ToBitmap(yuvByte, previewWidth, previewHeight) ?: return@post
+                    nV21ToBitmap?.nv21ToBitmap(yuvByte) ?: return@post
                 putVideoFrame(VideoFrame(bitmap, timestamp))
             }
         }
@@ -103,13 +108,20 @@ class FrameVideoRecorder {
     private var previewHeight: Int = 0
 
     fun start(width: Int, height: Int) {
+        if (isRecordStart){
+            LogUtils.d("正在录制...")
+            return
+        }
+        isRecordStart = true
         previewWidth = width
         previewHeight = height
         check(previewWidth != 0)
         check(previewHeight != 0)
+        LogUtils.d("FrameQueue.size :${FrameQueue.size}")
         if (FileUtils.isFileExists(videoSavePath))
             FileUtils.delete(videoSavePath)
         synchronized(recordVideoLock) {
+            nV21ToBitmap = NV21ToBitmap(Utils.getApp(),width, height)
             avcEncoder = AvcEncoder(30, tempVideoPath, 0)
         }
         encodeHandler.post {
@@ -138,7 +150,9 @@ class FrameVideoRecorder {
                     FileUtils.delete(tempVideoPath)
                     FileUtils.delete(tempAudioPath)
                 }
+                nV21ToBitmap = null
                 mainHandler.post {
+                    isRecordStart = false
                     if (FileUtils.isFileExists(videoSavePath) && File(videoSavePath).length() > 0)
                         onVideoCallback?.onVideo(File(videoSavePath))
                     else

@@ -12,6 +12,9 @@ import android.os.Handler;
 import android.os.Looper;
 import android.util.Log;
 
+import androidx.annotation.NonNull;
+
+import com.blankj.utilcode.util.ImageUtils;
 import com.blankj.utilcode.util.LogUtils;
 import com.blankj.utilcode.util.TimeUtils;
 
@@ -53,7 +56,7 @@ public class AvcEncoder {
 
     }
 
-    public void start(int width,int height) {
+    public void start(int width, int height) {
         LogUtils.d("开始");
         this.width = width;
         this.height = height;
@@ -136,14 +139,14 @@ public class AvcEncoder {
     }
 
 
-    public interface OnStopListener{
+    public interface OnStopListener {
         void onStop();
     }
 
-    private  OnStopListener onStopListener;
+    private OnStopListener onStopListener;
 
 
-    public void stop(OnStopListener callable){
+    public void stop(@NonNull OnStopListener callable) {
         isRunning = false;
         this.onStopListener = callable;
     }
@@ -171,7 +174,6 @@ public class AvcEncoder {
     }
 
 
-
     private int getSize(int size) {
         return size / 4 * 4;
     }
@@ -189,7 +191,10 @@ public class AvcEncoder {
         int[] argb = new int[inputWidth * inputHeight];
 
         //Log.i(TAG, "scaled : " + scaled);
-        scaled.getPixels(argb, 0, inputWidth, 0, 0, inputWidth, inputHeight);
+        Bitmap temp = scaled;
+        if (scaled.getWidth() < inputWidth || scaled.getHeight() < inputHeight)
+            temp = ImageUtils.scale(scaled, inputWidth, inputHeight);
+        temp.getPixels(argb, 0, inputWidth, 0, 0, inputWidth, inputHeight);
 
         byte[] yuv = new byte[inputWidth * inputHeight * 3 / 2];
 
@@ -462,15 +467,15 @@ public class AvcEncoder {
         }
         while (isRunning || FrameVideoRecorder.Companion.getFrameQueue().size() > 0) {
             VideoFrame yuvIntArray = FrameVideoRecorder.Companion.getFrameQueue().poll();
-            if (yuvIntArray == null){
+            if (yuvIntArray == null) {
                 continue;
             }
             long now = System.currentTimeMillis();
             int inputBufferIndex = mediaCodec.dequeueInputBuffer(-1);
             if (inputBufferIndex >= 0) {
                 long ptsUsec = yuvIntArray.getTimestamp();
-                LogUtils.d("ptsUsec : "+ptsUsec);
-                byte[] nv12ByteArray = getNV12(getSize(width),getSize(height),yuvIntArray.getFrameBitmap());
+                LogUtils.d("ptsUsec : " + ptsUsec);
+                byte[] nv12ByteArray = getNV12(getSize(width), getSize(height), yuvIntArray.getFrameBitmap());
                 ByteBuffer inputBuffer = null;
                 if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.LOLLIPOP) {
                     inputBuffer = buffers[inputBufferIndex];
@@ -497,7 +502,7 @@ public class AvcEncoder {
                     mTrackIndex = mediaMuxer.addTrack(mediaFormat);
                     mediaMuxer.start();
                     mMuxerStarted = true;
-                }else if (encoderStatus == MediaCodec.INFO_TRY_AGAIN_LATER){
+                } else if (encoderStatus == MediaCodec.INFO_TRY_AGAIN_LATER) {
                     LogUtils.d("等待");
                     continue;
                 } else if (encoderStatus >= 0) {
@@ -530,7 +535,7 @@ public class AvcEncoder {
                         Log.d(TAG, "BufferInfo: " + bufferInfo.offset + ","
                                 + bufferInfo.size + ","
                                 + bufferInfo.presentationTimeUs + ","
-                                + TimeUtils.millis2String(bufferInfo.presentationTimeUs/1000,"mm:ss"));
+                                + TimeUtils.millis2String(bufferInfo.presentationTimeUs / 1000, "mm:ss"));
 
                         try {
                             mediaMuxer.writeSampleData(mTrackIndex, outputBuffer, bufferInfo);
@@ -554,11 +559,10 @@ public class AvcEncoder {
             }
         }
         finish();
-        if (this.onStopListener != null){
+        if (this.onStopListener != null) {
             this.onStopListener.onStop();
         }
     }
-
 
 
 //    public void run(Bitmap bitmap) {
