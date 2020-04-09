@@ -62,7 +62,7 @@ public class AvcEncoder {
         this.height = height;
         int bitRate0 = bitRate;
         if (bitRate == 0) {
-            bitRate0 = width * height;
+            bitRate0 = (int) (width * height * 1.5 * 8 * 0.25f * 60 / 100.0f);
         }
 
         int[] formats = this.getMediaCodecList();
