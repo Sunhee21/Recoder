@@ -2,9 +2,10 @@ package com.example.camera1demo
 
 
 import android.content.pm.PackageManager
-import android.graphics.*
+import android.graphics.Bitmap
+import android.graphics.ImageFormat
+import android.graphics.PixelFormat
 import android.hardware.Camera
-import android.media.Image
 import android.os.Bundle
 import android.os.Handler
 import android.os.HandlerThread
@@ -16,7 +17,6 @@ import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
 import com.blankj.utilcode.util.*
 import kotlinx.android.synthetic.main.fragment_camera_shoot.*
-import java.io.ByteArrayOutputStream
 import java.io.File
 import java.util.concurrent.ArrayBlockingQueue
 import kotlin.math.max
@@ -77,7 +77,6 @@ class CameraShootFragment : Fragment(), SurfaceHolder.Callback, Camera.PreviewCa
     }
 
 
-
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
         initViewClick()
@@ -103,7 +102,7 @@ class CameraShootFragment : Fragment(), SurfaceHolder.Callback, Camera.PreviewCa
                 if (videoRecorder == null)
                     videoRecorder = FrameVideoRecorder()
                 videoRecorder?.setVideoSavePath(outPath)
-                videoRecorder?.setFileCallback(object :FrameVideoRecorder.OnVideoCallback{
+                videoRecorder?.setFileCallback(object : FrameVideoRecorder.OnVideoCallback {
                     override fun onVideo(file: File) {
                         ToastUtils.showShort("${file.absolutePath}")
                     }
@@ -122,6 +121,11 @@ class CameraShootFragment : Fragment(), SurfaceHolder.Callback, Camera.PreviewCa
         }
         bt_switch.setOnClickListener {
             switchCamera()
+        }
+        bt_focus.setOnClickListener {
+            mCurrentCamera?.autoFocus { success, camera ->
+
+            }
         }
     }
 
@@ -205,6 +209,21 @@ class CameraShootFragment : Fragment(), SurfaceHolder.Callback, Camera.PreviewCa
 
         mCurrentCamera!!.parameters?.also {
             it.setRotation(rotationDegree)
+            // 设置聚焦模式
+            // 设置聚焦模式
+            val supportedFocusModes: List<String> =
+                it.supportedFocusModes
+
+            // 连续聚焦
+            // 连续聚焦
+            if (supportedFocusModes != null && supportedFocusModes.contains(Camera.Parameters.FOCUS_MODE_CONTINUOUS_VIDEO)) {
+                it.focusMode = Camera.Parameters.FOCUS_MODE_CONTINUOUS_VIDEO
+            }
+            // 自动聚焦
+            // 自动聚焦
+            if (supportedFocusModes != null && supportedFocusModes.contains(Camera.Parameters.FOCUS_MODE_AUTO)) {
+                it.focusMode = Camera.Parameters.FOCUS_MODE_AUTO
+            }
             it.previewFrameRate = 30
             setPreviewSize(it, longSide, shortSide)
             mCurrentCamera?.setDisplayOrientation(
@@ -212,7 +231,6 @@ class CameraShootFragment : Fragment(), SurfaceHolder.Callback, Camera.PreviewCa
             )
             mCurrentCamera!!.parameters = it
         }
-
         LogUtils.d("-----------------${previewWidth} ${previewHeight}")
 
     }
@@ -242,29 +260,26 @@ class CameraShootFragment : Fragment(), SurfaceHolder.Callback, Camera.PreviewCa
             supportPreviewSize.forEach {
                 LogUtils.d("支持的预览尺寸 : ${it.width} ${it.height}")
             }
-            for (size in supportPreviewSize) {
-                if (size.width * 1f / size.height >= aspectRatio && size.height <= shortSide && size.width <= longSide) {
-                    previewHeight = size.width
-                    previewWidth = size.height
-                    parameters.setPreviewSize(size.width, size.height)
-                    if (isPreviewFormatSupported(parameters, PREVIEW_FORMAT)) {
-                        parameters.previewFormat = PREVIEW_FORMAT
-                        val frameWidth: Int = size.width
-                        val frameHeight: Int = size.height
-                        val previewFormat = parameters.previewFormat
-                        val pixelFormat = PixelFormat()
-                        PixelFormat.getPixelFormatInfo(previewFormat, pixelFormat)
-                        val bufferSize =
-                            frameWidth * frameHeight * pixelFormat.bitsPerPixel / 8
-                        mCurrentCamera!!.addCallbackBuffer(ByteArray(bufferSize))
-                        mCurrentCamera!!.addCallbackBuffer(ByteArray(bufferSize))
-                        mCurrentCamera!!.addCallbackBuffer(ByteArray(bufferSize))
-//                        Log.d(TAG, "Add three callback buffers with size: $bufferSize")
-                    }
+            val size = getCloselyPreSize(surfaceWidth,surfaceHeight,supportPreviewSize)?:return
 
-                    break;
-                }
+            previewHeight = size.width
+            previewWidth = size.height
+            parameters.setPreviewSize(size.width, size.height)
+            if (isPreviewFormatSupported(parameters, PREVIEW_FORMAT)) {
+                parameters.previewFormat = PREVIEW_FORMAT
+                val frameWidth: Int = size.width
+                val frameHeight: Int = size.height
+                val previewFormat = parameters.previewFormat
+                val pixelFormat = PixelFormat()
+                PixelFormat.getPixelFormatInfo(previewFormat, pixelFormat)
+                val bufferSize =
+                    frameWidth * frameHeight * pixelFormat.bitsPerPixel / 8
+                mCurrentCamera!!.addCallbackBuffer(ByteArray(bufferSize))
+                mCurrentCamera!!.addCallbackBuffer(ByteArray(bufferSize))
+                mCurrentCamera!!.addCallbackBuffer(ByteArray(bufferSize))
+//                        Log.d(TAG, "Add three callback buffers with size: $bufferSize")
             }
+
         }
     }
 
@@ -281,12 +296,18 @@ class CameraShootFragment : Fragment(), SurfaceHolder.Callback, Camera.PreviewCa
 
     override fun surfaceCreated(holder: SurfaceHolder?) {
         openCamera(mCurrentCameraId)
-        configCameraParameters()
-        startPreview(mPreviewSurfaceHolder ?: holder)
+
     }
+
+    private var surfaceWidth: Int = 0
+    private var surfaceHeight: Int = 0
 
     override fun surfaceChanged(holder: SurfaceHolder?, format: Int, width: Int, height: Int) {
         mPreviewSurfaceHolder = holder
+        surfaceWidth = width
+        surfaceHeight = height
+        configCameraParameters()
+        startPreview(mPreviewSurfaceHolder ?: holder)
     }
 
 
@@ -310,8 +331,21 @@ class CameraShootFragment : Fragment(), SurfaceHolder.Callback, Camera.PreviewCa
 
     override fun onPreviewFrame(data: ByteArray?, camera: Camera?) {
         mCurrentCamera?.addCallbackBuffer(data)
+        if (shoot && data!=null){
+            val dat = obtaintTrueByte(data,mCurrentCameraId == facingFrontCameraId,previewWidth,previewHeight)
+            val b = NV21ToBitmap(context!!,previewWidth,previewHeight).nv21ToBitmap(dat)
+            ImageUtils.save(b,"${Utils.getApp().filesDir}/1",Bitmap.CompressFormat.JPEG)
+            shoot = false
+        }
+
+
         if (data != null)
-            videoRecorder?.addCameraFrameByte(data, mCurrentCameraId == facingFrontCameraId,previewWidth,previewHeight)
+            videoRecorder?.addCameraFrameByte(
+                data,
+                mCurrentCameraId == facingFrontCameraId,
+                previewWidth,
+                previewHeight
+            )
     }
 
 
