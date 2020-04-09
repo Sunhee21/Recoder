@@ -33,7 +33,7 @@ public class AvcEncoder {
 
     private MediaCodec mediaCodec;
     //    public byte[] configByte;
-    public boolean isRunning;
+    public volatile boolean isRunning;
     private MediaMuxer mediaMuxer;
     private int mTrackIndex;
     private boolean mMuxerStarted;

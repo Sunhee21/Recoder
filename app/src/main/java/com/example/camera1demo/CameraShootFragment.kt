@@ -198,8 +198,6 @@ class CameraShootFragment : Fragment(), SurfaceHolder.Callback, Camera.PreviewCa
     }
 
     fun configCameraParameters() {
-
-
         val longSide = max(ScreenUtils.getScreenHeight(), ScreenUtils.getScreenWidth())
         val shortSide = min(ScreenUtils.getScreenHeight(), ScreenUtils.getScreenWidth())
         rotationDegree = getCameraDisplayOrientation(

@@ -60,9 +60,8 @@ class FrameVideoRecorder {
 
 
     private val isRecording
-        get() = synchronized(recordVideoLock) {
-            avcEncoder?.isRunning == true
-        }
+        get() = avcEncoder?.isRunning == true
+
 
 
     private var isRecordStart = false
@@ -174,6 +173,7 @@ class FrameVideoRecorder {
             }
             mMediaRecorder?.apply {
                 setAudioSource(MediaRecorder.AudioSource.MIC)
+//                setAudioSamplingRate(44100)
                 setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
                 setAudioEncoder(MediaRecorder.AudioEncoder.AAC)
                 setOutputFile(tempAudioPath);
