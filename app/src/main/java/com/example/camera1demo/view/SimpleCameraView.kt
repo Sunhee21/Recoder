@@ -2,14 +2,17 @@ package com.example.camera1demo.view
 
 import android.app.Activity
 import android.content.Context
+import android.graphics.Point
 import android.hardware.Camera
+import android.os.AsyncTask
 import android.util.AttributeSet
 import android.util.Log
 import android.view.SurfaceHolder
 import android.view.SurfaceView
-import com.example.camera1demo.camera.CameraOne
-import com.example.camera1demo.camera.ICamera
-import com.example.camera1demo.camera.IFrameCallback
+import com.blankj.utilcode.util.ToastUtils
+import com.example.camera1demo.NV21ToBitmap
+import com.example.camera1demo.camera.*
+import com.example.camera1demo.obtaintTrueByte
 
 /**
  * @intro
@@ -34,6 +37,8 @@ class SimpleCameraView @JvmOverloads constructor(
         holder?.addCallback(this)
     }
 
+    private var previewSize = Point(0,0)
+
     fun switchCamera(){
         if (mCamera.getCameraId() != Camera.CameraInfo.CAMERA_FACING_BACK){
             mCamera.opencamera(Camera.CameraInfo.CAMERA_FACING_BACK)
@@ -41,7 +46,7 @@ class SimpleCameraView @JvmOverloads constructor(
             mCamera.opencamera(Camera.CameraInfo.CAMERA_FACING_FRONT)
         }
         surfaceHolder?.let {
-            mCamera.startPreview(it,surfaceWidth,surfaceHeight)
+            previewSize = mCamera.startPreview(it,surfaceWidth,surfaceHeight)
         }
     }
 
@@ -56,7 +61,7 @@ class SimpleCameraView @JvmOverloads constructor(
             surfaceHeight = height
         }
         surfaceHolder?.let {
-            mCamera.startPreview(it,surfaceWidth,surfaceHeight)
+            previewSize =  mCamera.startPreview(it,surfaceWidth,surfaceHeight)
         }
     }
 
@@ -70,11 +75,51 @@ class SimpleCameraView @JvmOverloads constructor(
     }
 
     val TAG = this::class.java.name
+
     /**
      * 帧回调
      */
     override fun onFrameCallback(byteArray: ByteArray) {
         Log.d(TAG,"帧数回调 - ${System.currentTimeMillis()}")
+        if(iFlash!=null){
+            AsyncTask.execute {
+                val dat = obtaintTrueByte(byteArray,mCamera.getCameraId() == Camera.CameraInfo.CAMERA_FACING_FRONT,previewSize.x,previewSize.y)
+                val b = NV21ToBitmap(context,previewSize.x,previewSize.y).nv21ToBitmap(dat)
+                post {
+                    iFlash?.onFlashCallback(b)
+                    iFlash = null
+                }
+            }
+        }
     }
+
+    //<editor-fold desc="功能区">
+    private var iFlash:IFlash?=null
+    private var iShoot:IShoot?=null
+
+    /**
+     * 拍照
+     */
+    fun takePicture(iFlash: IFlash){
+        if (iShoot!=null){
+            Log.d(TAG,"当前正在录像")
+            return
+        }
+        this.iFlash = iFlash
+    }
+
+     /**
+     * 录像
+     */
+    fun startShoot(iShoot: IShoot){
+         if (iFlash!=null){
+             Log.d(TAG,"当前正在拍照")
+             return
+         }
+        this.iShoot = iShoot
+    }
+    //</editor-fold>
+
+
 
 }

@@ -1,11 +1,13 @@
 package com.example.camera1demo.fragment
 
+import android.graphics.Bitmap
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import androidx.fragment.app.Fragment
 import com.example.camera1demo.R
+import com.example.camera1demo.camera.IFlash
 import kotlinx.android.synthetic.main.fragment_camera_callback.*
 
 /**
@@ -32,6 +34,13 @@ class CameraCallbackFragment:Fragment() {
     private fun initViewClick() {
         bt_switch.setOnClickListener {
             simpleCameraView.switchCamera()
+        }
+        bt_flash.setOnClickListener {
+            simpleCameraView.takePicture(object :IFlash{
+                override fun onFlashCallback(bitmap: Bitmap) {
+                    iv_preview.setImageBitmap(bitmap)
+                }
+            })
         }
     }
 

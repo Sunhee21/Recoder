@@ -4,6 +4,7 @@ import android.app.Activity
 import android.content.pm.PackageManager
 import android.graphics.ImageFormat
 import android.graphics.PixelFormat
+import android.graphics.Point
 import android.hardware.Camera
 import android.view.Surface
 import android.view.SurfaceHolder
@@ -199,11 +200,12 @@ class CameraOne(val activity: Activity) :
     }
 
 
-    override fun startPreview(sufaceHolder: SurfaceHolder, surfaceWidth: Int, surfaceHeight: Int) {
+    override fun startPreview(sufaceHolder: SurfaceHolder, surfaceWidth: Int, surfaceHeight: Int):Point {
         configCameraParameters(surfaceWidth, surfaceHeight)
         mCurrentCamera?.setPreviewDisplay(sufaceHolder)
         mCurrentCamera?.startPreview()
         mCurrentCamera?.setPreviewCallback(this)
+        return Point(previewWidth,previewHeight)
     }
 
     override fun stopPreview() {
