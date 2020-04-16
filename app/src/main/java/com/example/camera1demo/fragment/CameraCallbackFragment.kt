@@ -8,7 +8,9 @@ import android.view.ViewGroup
 import androidx.fragment.app.Fragment
 import com.example.camera1demo.R
 import com.example.camera1demo.camera.IFlash
+import com.example.camera1demo.camera.IShoot
 import kotlinx.android.synthetic.main.fragment_camera_callback.*
+import java.io.File
 
 /**
  * @intro
@@ -39,6 +41,13 @@ class CameraCallbackFragment:Fragment() {
             simpleCameraView.takePicture(object :IFlash{
                 override fun onFlashCallback(bitmap: Bitmap) {
                     iv_preview.setImageBitmap(bitmap)
+                }
+            })
+        }
+        bt_shoot.setOnClickListener {
+            simpleCameraView.startShoot(object :IShoot{
+                override fun onShootCallback(file: File) {
+
                 }
             })
         }
