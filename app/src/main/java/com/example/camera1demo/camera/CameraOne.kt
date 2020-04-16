@@ -1,24 +1,25 @@
-package com.example.camera1demo
+package com.example.camera1demo.camera
 
 import android.app.Activity
-import android.content.Context
 import android.content.pm.PackageManager
 import android.graphics.ImageFormat
 import android.graphics.PixelFormat
 import android.hardware.Camera
+import android.view.Surface
 import android.view.SurfaceHolder
+import android.widget.Toast
 import androidx.core.content.ContextCompat
-import com.blankj.utilcode.util.LogUtils
-import com.blankj.utilcode.util.ScreenUtils
-import kotlin.math.max
-import kotlin.math.min
+import com.example.camera1demo.getCloselyPreSize
 
 /**
  * @intro
  * @author sunhee
  * @date 2020/4/9
  */
-class CameraOne(val activity:Activity):ICamera {
+class CameraOne(val activity: Activity) :
+    ICamera, Camera.PreviewCallback {
+
+    override var iFrameCallback: IFrameCallback? = null
 
 
     /**
@@ -42,10 +43,10 @@ class CameraOne(val activity:Activity):ICamera {
         for (cameraId in 0 until Camera.getNumberOfCameras()) {
             val cameraInfo = Camera.CameraInfo()
             Camera.getCameraInfo(cameraId, cameraInfo)
-            if (cameraInfo.facing == CameraShootFragment.FACING_BACK) {
+            if (cameraInfo.facing == Camera.CameraInfo.CAMERA_FACING_BACK) {
                 facingBackCameraInfo = cameraInfo
                 facingBackCameraId = cameraId
-            } else if (cameraInfo.facing == CameraShootFragment.FACING_FRONT) {
+            } else if (cameraInfo.facing == Camera.CameraInfo.CAMERA_FACING_FRONT) {
                 facingFrontCameraInfo = cameraInfo
                 facingFrontCameraId = cameraId
             }
@@ -61,16 +62,15 @@ class CameraOne(val activity:Activity):ICamera {
         mCurrentCamera?.setPreviewCallback(null)
         mCurrentCamera?.stopPreview()
     }
+
     private fun closeCamera() {
         mCurrentCamera?.release()
         mCurrentCamera = null
     }
 
 
-
     override fun opencamera(cameraId: Int) {
-        releasePreview()
-        closeCamera()
+        stopPreview()
         if (ContextCompat.checkSelfPermission(
                 activity,
                 android.Manifest.permission.CAMERA
@@ -85,17 +85,15 @@ class CameraOne(val activity:Activity):ICamera {
                 mCurrentCameraInfo = facingFrontCameraInfo
                 mCurrentCameraId = facingFrontCameraId
             } else {
-                throw RuntimeException("没相机可以开启")
+                Toast.makeText(activity, "没相机可以开启", Toast.LENGTH_SHORT).show()
             }
         }
-        configCameraParameters()
     }
+
     private var rotationDegree: Int = 0
 
 
-    private fun configCameraParameters() {
-        val longSide = max(ScreenUtils.getScreenHeight(), ScreenUtils.getScreenWidth())
-        val shortSide = min(ScreenUtils.getScreenHeight(), ScreenUtils.getScreenWidth())
+    private fun configCameraParameters(surfaceWidth: Int, surfaceHeight: Int) {
         rotationDegree = getCameraDisplayOrientation(
             activity!!,
             mCurrentCameraInfo!!
@@ -119,7 +117,7 @@ class CameraOne(val activity:Activity):ICamera {
                 it.focusMode = Camera.Parameters.FOCUS_MODE_AUTO
             }
             it.previewFrameRate = 30
-            setPreviewSize(it, longSide, shortSide)
+            setPreviewSize(it, surfaceWidth, surfaceHeight)
             mCurrentCamera?.setDisplayOrientation(
                 rotationDegree
             )
@@ -127,34 +125,63 @@ class CameraOne(val activity:Activity):ICamera {
         }
 
     }
+
+    private fun getCameraDisplayOrientation(
+        activity: Activity,
+        cameraInfo: Camera.CameraInfo
+    ): Int {
+        val rotation: Int = activity.getWindowManager().getDefaultDisplay().getRotation()
+        var degrees = 0
+        when (rotation) {
+            Surface.ROTATION_0 -> degrees = 0
+            Surface.ROTATION_90 -> degrees = 90
+            Surface.ROTATION_180 -> degrees = 180
+            Surface.ROTATION_270 -> degrees = 270
+        }
+        var result: Int
+        if (cameraInfo.facing === Camera.CameraInfo.CAMERA_FACING_FRONT) {
+            result = (cameraInfo.orientation + degrees) % 360
+            result = (360 - result) % 360 // compensate the mirror
+        } else { // back-facing
+            result = (cameraInfo.orientation - degrees + 360) % 360
+        }
+        return result
+    }
+
     private var previewWidth = 0
     private var previewHeight = 0
 
-    private fun setPreviewSize(parameters: Camera.Parameters, surfaceWidth: Int, surfaceHeight: Int) {
+    private fun setPreviewSize(
+        parameters: Camera.Parameters,
+        surfaceWidth: Int,
+        surfaceHeight: Int
+    ) {
         if (mCurrentCamera != null) {
             val supportPreviewSize = parameters.supportedPreviewSizes
-            supportPreviewSize.forEach {
-                LogUtils.d("支持的预览尺寸 : ${it.width} ${it.height}")
-            }
-            val size = getCloselyPreSize(surfaceWidth,surfaceHeight,supportPreviewSize)?:return
-
+//            supportPreviewSize.forEach {
+//                LogUtils.d("支持的预览尺寸 : ${it.width} ${it.height}")
+//            }
+            val size = getCloselyPreSize(
+                surfaceWidth,
+                surfaceHeight,
+                supportPreviewSize
+            ) ?: return
             previewHeight = size.width
             previewWidth = size.height
             parameters.setPreviewSize(size.width, size.height)
             if (isPreviewFormatSupported(parameters, ImageFormat.NV21)) {
                 parameters.previewFormat = ImageFormat.NV21
-                val frameWidth: Int = size.width
-                val frameHeight: Int = size.height
-                val previewFormat = parameters.previewFormat
-                val pixelFormat = PixelFormat()
-                PixelFormat.getPixelFormatInfo(previewFormat, pixelFormat)
-                val bufferSize =
-                    frameWidth * frameHeight * pixelFormat.bitsPerPixel / 8
-                mCurrentCamera!!.addCallbackBuffer(ByteArray(bufferSize))
-                mCurrentCamera!!.addCallbackBuffer(ByteArray(bufferSize))
-                mCurrentCamera!!.addCallbackBuffer(ByteArray(bufferSize))
-//                        Log.d(TAG, "Add three callback buffers with size: $bufferSize")
             }
+            val frameWidth: Int = size.width
+            val frameHeight: Int = size.height
+            val previewFormat = parameters.previewFormat
+            val pixelFormat = PixelFormat()
+            PixelFormat.getPixelFormatInfo(previewFormat, pixelFormat)
+            val bufferSize =
+                frameWidth * frameHeight * pixelFormat.bitsPerPixel / 8
+            mCurrentCamera!!.addCallbackBuffer(ByteArray(bufferSize))
+            mCurrentCamera!!.addCallbackBuffer(ByteArray(bufferSize))
+            mCurrentCamera!!.addCallbackBuffer(ByteArray(bufferSize))
 
         }
     }
@@ -172,14 +199,21 @@ class CameraOne(val activity:Activity):ICamera {
     }
 
 
-    override fun startPreview(sufaceHolder: SurfaceHolder) {
+    override fun startPreview(sufaceHolder: SurfaceHolder, surfaceWidth: Int, surfaceHeight: Int) {
+        configCameraParameters(surfaceWidth, surfaceHeight)
         mCurrentCamera?.setPreviewDisplay(sufaceHolder)
         mCurrentCamera?.startPreview()
-//        mCurrentCamera?.setPreviewCallback(this)
+        mCurrentCamera?.setPreviewCallback(this)
     }
 
     override fun stopPreview() {
         releasePreview()
         closeCamera()
+    }
+
+    override fun getCameraId() = mCurrentCameraId ?: Camera.CameraInfo.CAMERA_FACING_BACK
+    override fun onPreviewFrame(data: ByteArray?, camera: Camera?) {
+        if (data != null)
+            iFrameCallback?.onFrameCallback(data)
     }
 }

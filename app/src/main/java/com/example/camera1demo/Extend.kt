@@ -11,24 +11,7 @@ import android.view.Surface
  * @author sunhee
  * @date 2020/4/1
  */
-fun getCameraDisplayOrientation(activity:Activity,cameraInfo: CameraInfo): Int {
-    val rotation: Int = activity.getWindowManager().getDefaultDisplay().getRotation()
-    var degrees = 0
-    when (rotation) {
-        Surface.ROTATION_0 -> degrees = 0
-        Surface.ROTATION_90 -> degrees = 90
-        Surface.ROTATION_180 -> degrees = 180
-        Surface.ROTATION_270 -> degrees = 270
-    }
-    var result: Int
-    if (cameraInfo.facing === Camera.CameraInfo.CAMERA_FACING_FRONT) {
-        result = (cameraInfo.orientation + degrees) % 360
-        result = (360 - result) % 360 // compensate the mirror
-    } else { // back-facing
-        result = (cameraInfo.orientation - degrees + 360) % 360
-    }
-    return result
-}
+
 
 fun rotateYUV420Degree90(
     data: ByteArray,
