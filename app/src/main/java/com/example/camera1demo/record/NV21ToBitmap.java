@@ -1,4 +1,4 @@
-package com.example.camera1demo;
+package com.example.camera1demo.record;
 
 import android.content.Context;
 import android.graphics.Bitmap;

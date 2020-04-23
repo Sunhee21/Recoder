@@ -1,4 +1,4 @@
-package com.example.camera1demo
+package com.example.camera1demo.record
 
 import android.media.MediaRecorder
 import android.os.Handler
@@ -7,6 +7,7 @@ import android.os.Looper
 import com.blankj.utilcode.util.FileUtils
 import com.blankj.utilcode.util.LogUtils
 import com.blankj.utilcode.util.Utils
+import com.example.camera1demo.*
 import java.io.File
 import java.util.concurrent.ArrayBlockingQueue
 
@@ -27,7 +28,9 @@ class FrameVideoRecorder {
     companion object {
         val queueSize = 10
         const val OP_YUV = 1001
-        var FrameQueue: ArrayBlockingQueue<VideoFrame?> = ArrayBlockingQueue(queueSize)
+        var FrameQueue: ArrayBlockingQueue<VideoFrame?> = ArrayBlockingQueue(
+            queueSize
+        )
     }
 
     var videoSavePath: String? = null
@@ -82,15 +85,29 @@ class FrameVideoRecorder {
                 now - startRecordeUs
             }
             bitmapHandler.post {
-                val yuvByte = obtaintTrueByte(byteArray, isFacingFront, frameWidth, frameHeight)
+                val yuvByte = obtaintTrueByte(
+                    byteArray,
+                    isFacingFront,
+                    frameWidth,
+                    frameHeight
+                )
                     ?: return@post
                 val canUse = nV21ToBitmap?.checkSize(frameWidth,frameHeight)?:false //切换摄像头可能导致帧尺寸改变，改变需要重新实例化
                 if (!canUse){
-                    nV21ToBitmap = NV21ToBitmap(Utils.getApp(),frameWidth,frameHeight)
+                    nV21ToBitmap = NV21ToBitmap(
+                        Utils.getApp(),
+                        frameWidth,
+                        frameHeight
+                    )
                 }
                 val bitmap =
                     nV21ToBitmap?.nv21ToBitmap(yuvByte) ?: return@post
-                putVideoFrame(VideoFrame(bitmap, timestamp))
+                putVideoFrame(
+                    VideoFrame(
+                        bitmap,
+                        timestamp
+                    )
+                )
             }
         }
     }
@@ -120,7 +137,11 @@ class FrameVideoRecorder {
         if (FileUtils.isFileExists(videoSavePath))
             FileUtils.delete(videoSavePath)
         synchronized(recordVideoLock) {
-            nV21ToBitmap = NV21ToBitmap(Utils.getApp(),width, height)
+            nV21ToBitmap = NV21ToBitmap(
+                Utils.getApp(),
+                width,
+                height
+            )
             avcEncoder = AvcEncoder(30, tempVideoPath, 0)
         }
         encodeHandler.post {
@@ -144,7 +165,11 @@ class FrameVideoRecorder {
             avcEncoder?.stop {
                 //在encodeThread回调
                 //结束后合并语音和视频文件
-                H264_AAC_toMp4_MediaMuxer.combineVideo(tempVideoPath, tempAudioPath, videoSavePath)
+                H264_AAC_toMp4_MediaMuxer.combineVideo(
+                    tempVideoPath,
+                    tempAudioPath,
+                    videoSavePath
+                )
                 if (!BuildConfig.DEBUG) {
                     FileUtils.delete(tempVideoPath)
                     FileUtils.delete(tempAudioPath)

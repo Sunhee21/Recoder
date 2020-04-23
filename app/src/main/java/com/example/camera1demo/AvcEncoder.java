@@ -8,8 +8,6 @@ import android.media.MediaCodecList;
 import android.media.MediaFormat;
 import android.media.MediaMuxer;
 import android.os.Build;
-import android.os.Handler;
-import android.os.Looper;
 import android.util.Log;
 
 import androidx.annotation.NonNull;
@@ -17,11 +15,11 @@ import androidx.annotation.NonNull;
 import com.blankj.utilcode.util.ImageUtils;
 import com.blankj.utilcode.util.LogUtils;
 import com.blankj.utilcode.util.TimeUtils;
+import com.example.camera1demo.record.FrameVideoRecorder;
+import com.example.camera1demo.record.VideoFrame;
 
 import java.io.IOException;
-import java.lang.invoke.CallSite;
 import java.nio.ByteBuffer;
-import java.util.concurrent.Callable;
 
 
 public class AvcEncoder {

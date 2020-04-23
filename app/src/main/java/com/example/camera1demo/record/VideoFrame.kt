@@ -1,4 +1,4 @@
-package com.example.camera1demo
+package com.example.camera1demo.record
 
 import android.graphics.Bitmap
 import java.sql.Timestamp

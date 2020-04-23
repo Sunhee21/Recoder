@@ -10,7 +10,7 @@ import android.view.Surface
 import android.view.SurfaceHolder
 import android.widget.Toast
 import androidx.core.content.ContextCompat
-import com.example.camera1demo.getCloselyPreSize
+import com.example.camera1demo.record.getCloselyPreSize
 
 /**
  * @intro
@@ -72,23 +72,19 @@ class CameraOne(val activity: Activity) :
 
     override fun opencamera(cameraId: Int) {
         stopPreview()
-        if (ContextCompat.checkSelfPermission(
-                activity,
-                android.Manifest.permission.CAMERA
-            ) == PackageManager.PERMISSION_GRANTED
-        ) {
-            if (hasBackCamera() && (cameraId == null || cameraId == facingBackCameraId)) {
-                mCurrentCamera = Camera.open(facingBackCameraId!!)
-                mCurrentCameraInfo = facingBackCameraInfo
-                mCurrentCameraId = facingBackCameraId
-            } else if (hasFrontCamera() && (cameraId == null || cameraId == facingFrontCameraId)) {
-                mCurrentCamera = Camera.open(facingFrontCameraId!!)
-                mCurrentCameraInfo = facingFrontCameraInfo
-                mCurrentCameraId = facingFrontCameraId
-            } else {
-                Toast.makeText(activity, "没相机可以开启", Toast.LENGTH_SHORT).show()
-            }
+
+        if (hasBackCamera() && (cameraId == null || cameraId == facingBackCameraId)) {
+            mCurrentCamera = Camera.open(facingBackCameraId!!)
+            mCurrentCameraInfo = facingBackCameraInfo
+            mCurrentCameraId = facingBackCameraId
+        } else if (hasFrontCamera() && (cameraId == null || cameraId == facingFrontCameraId)) {
+            mCurrentCamera = Camera.open(facingFrontCameraId!!)
+            mCurrentCameraInfo = facingFrontCameraInfo
+            mCurrentCameraId = facingFrontCameraId
+        } else {
+            Toast.makeText(activity, "没相机可以开启", Toast.LENGTH_SHORT).show()
         }
+
     }
 
     private var rotationDegree: Int = 0
@@ -200,12 +196,16 @@ class CameraOne(val activity: Activity) :
     }
 
 
-    override fun startPreview(sufaceHolder: SurfaceHolder, surfaceWidth: Int, surfaceHeight: Int):Point {
+    override fun startPreview(
+        sufaceHolder: SurfaceHolder,
+        surfaceWidth: Int,
+        surfaceHeight: Int
+    ): Point {
         configCameraParameters(surfaceWidth, surfaceHeight)
         mCurrentCamera?.setPreviewDisplay(sufaceHolder)
         mCurrentCamera?.startPreview()
         mCurrentCamera?.setPreviewCallback(this)
-        return Point(previewWidth,previewHeight)
+        return Point(previewWidth, previewHeight)
     }
 
     override fun stopPreview() {
