@@ -21,7 +21,6 @@ import android.os.Message
 import android.provider.Settings
 import android.view.*
 import android.widget.Toast
-import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
 import com.blankj.utilcode.util.*
@@ -38,8 +37,9 @@ import kotlin.math.max
  * @author sunhee
  * @date 2020/4/16
  */
-class CameraCallbackFragment : Fragment() {
+class CameraCallbackFragment : Fragment(), SurfaceHolder.Callback {
     companion object {
+
 
         fun newInstance() = CameraCallbackFragment()
 
@@ -93,6 +93,7 @@ class CameraCallbackFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
+        simpleCameraView.holder?.addCallback(this)
         initViewClick()
     }
 
@@ -116,7 +117,7 @@ class CameraCallbackFragment : Fragment() {
                 MotionEvent.ACTION_DOWN -> {
                     isTimeout = false
                     isCancel = false
-                    tv_info.text = "  "//只能空白不然bug
+                    tv_info.text = "  "//只能空白不然按钮动画被裁减bug
                     mDownTime = System.currentTimeMillis()
                     handler.sendEmptyMessageDelayed(2, 400L)
                     true
@@ -286,9 +287,19 @@ class CameraCallbackFragment : Fragment() {
         record()
     }
 
-    override fun onStart() {
-        super.onStart()
-        requestPemission()
+
+    //<editor-fold desc="权限相关">
+     val REQUEST_PERMISSION = 0x11//单单启动预览只有相机权限要弹窗
+     val REQUEST_PERMISSION_NEED_AUDIO = 0x12 //点击拍照什么的需要提示存储和录音权限
+    private fun requestPemission(code: Int = REQUEST_PERMISSION) {
+        requestPermissions(
+            arrayOf(
+                Manifest.permission.CAMERA,
+                Manifest.permission.WRITE_EXTERNAL_STORAGE,
+                Manifest.permission.RECORD_AUDIO
+            )
+            , code
+        )
     }
 
     private fun checkPermission(): Boolean {
@@ -300,39 +311,30 @@ class CameraCallbackFragment : Fragment() {
             activity!!,
             Manifest.permission.RECORD_AUDIO
         ) == PackageManager.PERMISSION_GRANTED
-        if (!p1 || !p2) {
+        val p3 = ContextCompat.checkSelfPermission(
+            activity!!,
+            Manifest.permission.WRITE_EXTERNAL_STORAGE
+        ) == PackageManager.PERMISSION_GRANTED
+        if (!p1 || !p2 || !p3) {
             requestPemission(REQUEST_PERMISSION_NEED_AUDIO)
         }
-        return p1 && p2
+        return p1 && p2 && p3
     }
 
-    private fun requestPemission(code:Int = REQUEST_PERMISSION) {
-        requestPermissions(
-            arrayOf<String>(Manifest.permission.CAMERA, Manifest.permission.RECORD_AUDIO)
-            , code
-        )
-    }
-
-    val REQUEST_PERMISSION = 0x11
-    val REQUEST_PERMISSION_NEED_AUDIO = 0x12
-
-
-    private var permissionDialog: AlertDialog? = null
-
-
-    @SuppressLint("MissingPermission")
     override fun onRequestPermissionsResult(
         requestCode: Int,
         permissions: Array<out String>,
         grantResults: IntArray
     ) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         if (requestCode == REQUEST_PERMISSION || requestCode == REQUEST_PERMISSION_NEED_AUDIO) {
             permissions.forEachIndexed { index, s ->
                 val grant = grantResults[index]
-                val should = ActivityCompat.shouldShowRequestPermissionRationale(activity!!, s)
+//                val should = ActivityCompat.shouldShowRequestPermissionRationale(activity!!, s)
                 if (s == Manifest.permission.CAMERA) {
                     if (grant == PackageManager.PERMISSION_GRANTED) {
                         //打开相机
+                        simpleCameraView.openCamera()
                     } else {
                         showPermissionDialog("缺少相机权限")
                     }
@@ -343,23 +345,20 @@ class CameraCallbackFragment : Fragment() {
                         if (requestCode == REQUEST_PERMISSION_NEED_AUDIO)
                             showPermissionDialog("缺少录音权限")
                     }
+                } else if (s == Manifest.permission.WRITE_EXTERNAL_STORAGE) {
+                    if (grant == PackageManager.PERMISSION_GRANTED) {
+                        //可以保存文件
+                    } else {
+                        if (requestCode == REQUEST_PERMISSION_NEED_AUDIO)
+                            showPermissionDialog("缺少存储权限")
+                    }
                 }
             }
 
-//                AlertDialog.Builder(context!!)
-//                        .setTitle("")
-//                        .setMessage("Smartass Detected!")
-//                        .setPositiveButton("I am smartass") { _, _ ->
-//                            throw SmartassException
-//                        }
-//                        .setNegativeButton("Sorry") { _, _ ->
-//                            openCamera(goldenEye.availableCameras[0])
-//                        }
-//                        .setCancelable(false)
-//                        .show()
-
         }
+
     }
+    private var permissionDialog: AlertDialog? = null
 
     private fun showPermissionDialog(str: String) {
         if (permissionDialog == null)
@@ -381,6 +380,10 @@ class CameraCallbackFragment : Fragment() {
                 }
                 .show()
     }
+
+
+
+    //</editor-fold>
 
     private fun record() {
         isRecording = true
@@ -459,6 +462,16 @@ class CameraCallbackFragment : Fragment() {
             start()
 
         }
+    }
+
+    override fun surfaceChanged(holder: SurfaceHolder?, format: Int, width: Int, height: Int) {
+        requestPemission()
+    }
+
+    override fun surfaceDestroyed(holder: SurfaceHolder?) {
+    }
+
+    override fun surfaceCreated(holder: SurfaceHolder?) {
     }
 }
 

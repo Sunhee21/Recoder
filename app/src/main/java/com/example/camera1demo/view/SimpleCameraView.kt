@@ -9,7 +9,7 @@ import android.util.AttributeSet
 import android.util.Log
 import android.view.SurfaceHolder
 import android.view.SurfaceView
-import com.blankj.utilcode.util.ToastUtils
+import androidx.appcompat.app.AppCompatActivity
 import com.example.camera1demo.record.FrameVideoRecorder
 import com.example.camera1demo.record.NV21ToBitmap
 import com.example.camera1demo.camera.*
@@ -29,6 +29,7 @@ class SimpleCameraView @JvmOverloads constructor(
 ) : SurfaceView(context, attributeSet, defaultStyle)
     , SurfaceHolder.Callback,
     IFrameCallback {
+    private val TAG = this::class.java.name
 
     private var videoRecorder: FrameVideoRecorder? = null
     private val mCamera: ICamera
@@ -41,16 +42,7 @@ class SimpleCameraView @JvmOverloads constructor(
 
     private var previewSize = Point(0, 0)
 
-    fun switchCamera() {
-        if (mCamera.getCameraId() != Camera.CameraInfo.CAMERA_FACING_BACK) {
-            mCamera.opencamera(Camera.CameraInfo.CAMERA_FACING_BACK)
-        } else {
-            mCamera.opencamera(Camera.CameraInfo.CAMERA_FACING_FRONT)
-        }
-        surfaceHolder?.let {
-            previewSize = mCamera.startPreview(it, surfaceWidth, surfaceHeight)
-        }
-    }
+
 
     private var surfaceHolder: SurfaceHolder? = null
     private var surfaceWidth: Int = 0
@@ -62,9 +54,6 @@ class SimpleCameraView @JvmOverloads constructor(
             surfaceWidth = width
             surfaceHeight = height
         }
-        surfaceHolder?.let {
-            previewSize = mCamera.startPreview(it, surfaceWidth, surfaceHeight)
-        }
     }
 
 
@@ -73,16 +62,33 @@ class SimpleCameraView @JvmOverloads constructor(
     }
 
     override fun surfaceCreated(p0: SurfaceHolder?) {
-        mCamera.opencamera(Camera.CameraInfo.CAMERA_FACING_BACK)
     }
 
-    val TAG = this::class.java.name
+
+    fun openCamera() {
+        mCamera.opencamera(mCamera.getCameraId())
+        surfaceHolder?.let {
+            previewSize = mCamera.startPreview(it, surfaceWidth, surfaceHeight)
+        }
+    }
+
+    fun switchCamera() {
+        surfaceHolder?.let {
+            if (mCamera.getCameraId() != Camera.CameraInfo.CAMERA_FACING_BACK) {
+                mCamera.opencamera(Camera.CameraInfo.CAMERA_FACING_BACK)
+            } else {
+                mCamera.opencamera(Camera.CameraInfo.CAMERA_FACING_FRONT)
+            }
+            previewSize = mCamera.startPreview(it, surfaceWidth, surfaceHeight)
+        }
+    }
+
 
     /**
      * 帧回调
      */
     override fun onFrameCallback(byteArray: ByteArray) {
-        Log.d(TAG, "帧数回调 - ${System.currentTimeMillis()}")
+//        Log.d(TAG, "帧数回调 - ${System.currentTimeMillis()}")
         if (iFlash != null) {
             AsyncTask.execute {
                 val dat = obtaintTrueByte(
