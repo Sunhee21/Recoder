@@ -58,7 +58,7 @@ class FrameVideoRecorder {
         return this
     }
 
-    var startRecordeUs = 0L
+    private var startRecordeUs = 0L
     private var nV21ToBitmap: NV21ToBitmap? = null
 
 
@@ -113,7 +113,7 @@ class FrameVideoRecorder {
     }
 
 
-    fun putVideoFrame(x: VideoFrame) {
+    private fun putVideoFrame(x: VideoFrame) {
         if (FrameQueue.size >= queueSize) {
             FrameQueue.poll()
         }
@@ -129,6 +129,7 @@ class FrameVideoRecorder {
             return
         }
         isRecordStart = true
+        startRecordeUs = 0L
         previewWidth = width
         previewHeight = height
         check(previewWidth != 0)
@@ -177,7 +178,7 @@ class FrameVideoRecorder {
                 nV21ToBitmap = null
                 mainHandler.post {
                     isRecordStart = false
-                    if (FileUtils.isFileExists(videoSavePath) && File(videoSavePath).length() > 0)
+                    if (File(videoSavePath).exists() && File(videoSavePath).length() > 0)
                         onVideoCallback?.onVideo(File(videoSavePath))
                     else
                         onVideoCallback?.onFail()
@@ -198,7 +199,7 @@ class FrameVideoRecorder {
             }
             mMediaRecorder?.apply {
                 setAudioSource(MediaRecorder.AudioSource.MIC)
-//                setAudioSamplingRate(44100)
+                setAudioSamplingRate(44100)
                 setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
                 setAudioEncoder(MediaRecorder.AudioEncoder.AAC)
                 setOutputFile(tempAudioPath);

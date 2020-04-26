@@ -381,7 +381,15 @@ class CameraCallbackFragment : Fragment(), SurfaceHolder.Callback {
                 .show()
     }
 
+    override fun surfaceChanged(holder: SurfaceHolder?, format: Int, width: Int, height: Int) {
+        requestPemission()
+    }
 
+    override fun surfaceDestroyed(holder: SurfaceHolder?) {
+    }
+
+    override fun surfaceCreated(holder: SurfaceHolder?) {
+    }
 
     //</editor-fold>
 
@@ -464,15 +472,7 @@ class CameraCallbackFragment : Fragment(), SurfaceHolder.Callback {
         }
     }
 
-    override fun surfaceChanged(holder: SurfaceHolder?, format: Int, width: Int, height: Int) {
-        requestPemission()
-    }
 
-    override fun surfaceDestroyed(holder: SurfaceHolder?) {
-    }
-
-    override fun surfaceCreated(holder: SurfaceHolder?) {
-    }
 }
 
 /**

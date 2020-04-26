@@ -10,6 +10,7 @@ import android.util.Log
 import android.view.SurfaceHolder
 import android.view.SurfaceView
 import androidx.appcompat.app.AppCompatActivity
+import com.blankj.utilcode.util.LogUtils
 import com.example.camera1demo.record.FrameVideoRecorder
 import com.example.camera1demo.record.NV21ToBitmap
 import com.example.camera1demo.camera.*
@@ -41,7 +42,6 @@ class SimpleCameraView @JvmOverloads constructor(
     }
 
     private var previewSize = Point(0, 0)
-
 
 
     private var surfaceHolder: SurfaceHolder? = null
@@ -108,6 +108,14 @@ class SimpleCameraView @JvmOverloads constructor(
                 }
             }
         }
+        if (iShoot != null) {
+            videoRecorder?.addCameraFrameByte(
+                byteArray
+                , mCamera.getCameraId() == Camera.CameraInfo.CAMERA_FACING_FRONT
+                , previewSize.x
+                , previewSize.y
+            )
+        }
     }
 
     //<editor-fold desc="功能区">
@@ -153,6 +161,7 @@ class SimpleCameraView @JvmOverloads constructor(
 
     fun stopShoot() {
         videoRecorder?.stop()
+        iShoot = null
     }
     //</editor-fold>
 
