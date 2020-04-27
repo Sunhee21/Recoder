@@ -459,9 +459,11 @@ public class AvcEncoder {
 
     private void encode() {
         final int TIMEOUT_USEC = 10000;
-        ByteBuffer[] buffers = null;
+        ByteBuffer[] inputBuffers = null;
+        ByteBuffer[] outputBuffers = null;
         if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.LOLLIPOP) {
-            buffers = mediaCodec.getInputBuffers();
+            inputBuffers = mediaCodec.getInputBuffers();
+            outputBuffers = mediaCodec.getOutputBuffers();
         }
         while (isRunning || FrameVideoRecorder.Companion.getFrameQueue().size() > 0) {
             VideoFrame yuvIntArray = FrameVideoRecorder.Companion.getFrameQueue().poll();
@@ -476,7 +478,7 @@ public class AvcEncoder {
                 byte[] nv12ByteArray = getNV12(getSize(width), getSize(height), yuvIntArray.getFrameBitmap());
                 ByteBuffer inputBuffer = null;
                 if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.LOLLIPOP) {
-                    inputBuffer = buffers[inputBufferIndex];
+                    inputBuffer = inputBuffers[inputBufferIndex];
                 } else {
                     inputBuffer = mediaCodec.getInputBuffer(inputBufferIndex);//inputBuffers[inputBufferIndex];
                 }
@@ -506,7 +508,7 @@ public class AvcEncoder {
                 } else if (encoderStatus >= 0) {
                     ByteBuffer outputBuffer = null;
                     if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.LOLLIPOP) {
-                        outputBuffer = buffers[encoderStatus];
+                        outputBuffer = outputBuffers[encoderStatus];
                     } else {
                         outputBuffer = mediaCodec.getOutputBuffer(encoderStatus);
                     }
