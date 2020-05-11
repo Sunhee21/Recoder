@@ -8,6 +8,7 @@ import android.view.WindowManager
 import android.widget.Toast
 import com.blankj.utilcode.util.LogUtils
 import com.example.camera1demo.fragment.CameraCallbackFragment
+import com.example.camera1demo.fragment.CameraGLFragment
 
 class MainActivity : AppCompatActivity() {
 
@@ -24,7 +25,7 @@ class MainActivity : AppCompatActivity() {
             return
         }
         savedInstanceState ?: supportFragmentManager.beginTransaction()
-                .replace(R.id.container, CameraCallbackFragment())
+                .replace(R.id.container, CameraGLFragment())
                 .commit()
     }
 }

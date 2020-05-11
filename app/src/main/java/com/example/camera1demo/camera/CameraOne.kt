@@ -5,11 +5,13 @@ import android.content.pm.PackageManager
 import android.graphics.ImageFormat
 import android.graphics.PixelFormat
 import android.graphics.Point
+import android.graphics.SurfaceTexture
 import android.hardware.Camera
 import android.view.Surface
 import android.view.SurfaceHolder
 import android.widget.Toast
 import androidx.core.content.ContextCompat
+import com.blankj.utilcode.util.LogUtils
 import com.example.camera1demo.record.getCloselyPreSize
 
 /**
@@ -86,6 +88,7 @@ class CameraOne(val activity: Activity) :
         }
 
     }
+
 
     private var rotationDegree: Int = 0
 
@@ -165,6 +168,7 @@ class CameraOne(val activity: Activity) :
             ) ?: return
             previewHeight = size.width
             previewWidth = size.height
+            LogUtils.d("预览尺寸：${previewWidth} ${previewHeight}")
             parameters.setPreviewSize(size.width, size.height)
             if (isPreviewFormatSupported(parameters, ImageFormat.NV21)) {
                 parameters.previewFormat = ImageFormat.NV21
@@ -207,6 +211,19 @@ class CameraOne(val activity: Activity) :
         mCurrentCamera?.setPreviewCallback(this)
         return Point(previewWidth, previewHeight)
     }
+
+    override fun startPreview(
+        texture: SurfaceTexture,
+        surfaceWidth: Int,
+        surfaceHeight: Int
+    ): Point {
+        configCameraParameters(surfaceWidth, surfaceHeight)
+        mCurrentCamera?.setPreviewTexture(texture)
+        mCurrentCamera?.startPreview()
+        mCurrentCamera?.setPreviewCallback(this)
+        return Point(previewWidth, previewHeight)
+    }
+
 
     override fun stopPreview() {
         releasePreview()

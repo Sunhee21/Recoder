@@ -1,6 +1,7 @@
 package com.example.camera1demo.camera
 
 import android.graphics.Point
+import android.graphics.SurfaceTexture
 import android.view.SurfaceHolder
 
 /**
@@ -14,7 +15,10 @@ interface ICamera {
 
     fun opencamera(id:Int)
 
+
+
     fun startPreview(sufaceHolder: SurfaceHolder,surfaceWidth:Int,surfaceHeight: Int):Point
+    fun startPreview(texture: SurfaceTexture,surfaceWidth:Int,surfaceHeight: Int):Point
 
     fun stopPreview()
 
